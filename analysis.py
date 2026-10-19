@@ -1,17 +1,19 @@
-"""Baseline (pixel MLP, stand-in for the paper's CNN) vs improved (HOG-style features + LightGBM)
-on the Olivetti faces set, a public image set where each subject appears repeatedly."""
+"""Baseline (pixel MLP, stand-in for the paper's CNN) vs improved (HOG-style features +
+standardised multinomial logistic regression with balanced class weights) on the Olivetti faces
+set, a public image set where each subject appears repeatedly."""
 import json
+import os
 import socket
 import sys
 import time
 import warnings
 
-import lightgbm as lgb
 import matplotlib
 matplotlib.use("Agg")  # headless plotting on CI
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.datasets import fetch_olivetti_faces
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, log_loss
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.neural_network import MLPClassifier
@@ -22,7 +24,7 @@ SEED = 42
 SEEDS = [42, 43, 44]  # both models are randomised, so repeat over these seeds
 SOURCE_URL = "https://scikit-learn.org/stable/datasets/real_world.html#the-olivetti-faces-dataset"
 T0 = time.time()
-warnings.filterwarnings("ignore")  # silence MLP convergence warnings in the small grid
+warnings.filterwarnings("ignore")  # silence convergence warnings in the small grids
 
 
 def log(msg):
@@ -81,9 +83,12 @@ def main():
                              MLPClassifier(max_iter=300, random_state=seed))
 
     def make_improved(seed):
-        return lgb.LGBMClassifier(class_weight="balanced", subsample=0.8, subsample_freq=1,
-                                  colsample_bytree=0.8, learning_rate=0.05,
-                                  random_state=seed, verbose=-1, n_jobs=2)
+        # Linear model on HOG features: with ~7 images per subject, boosted trees
+        # overfit badly (CV accuracy ~0.78), while a regularised linear classifier on
+        # gradient-orientation features suits small-sample, many-class identity recognition.
+        return make_pipeline(StandardScaler(),
+                             LogisticRegression(max_iter=5000, class_weight="balanced",
+                                                random_state=seed))
 
     # Hyper-parameter search: 3-fold CV on the TRAINING split only (seed 42)
     grids = {
@@ -91,8 +96,7 @@ def main():
             "mlpclassifier__alpha": [1e-4, 1e-2],
             "mlpclassifier__hidden_layer_sizes": [(100,), (256,)]}),
         "improved": (make_improved(SEED), X_hog, {
-            "n_estimators": [200, 400],
-            "num_leaves": [15, 31]}),
+            "logisticregression__C": [0.01, 0.1, 1.0, 10.0]}),
     }
     best = {}
     for name, (est, X, grid) in grids.items():
@@ -124,12 +128,14 @@ def main():
         raise ValueError("non-finite metrics")
 
     results = {
-        "question": ("Can a gradient-boosting model on compact image features beat a pixel-based "
-                     "neural-network stand-in for the paper's ResNet50 on a public image set with "
-                     "repeated subjects, when the test split is kept within the same subjects?"),
-        "method": ("Stratified within-subject split; standardised pixel MLP baseline vs LightGBM "
-                   "with balanced class weights on HOG-style gradient-orientation features; "
-                   "3-fold stratified CV on the training split for tuning; test set used once per seed."),
+        "question": ("Can a regularised linear model on HOG-style gradient features beat a "
+                     "pixel-based neural-network stand-in for the paper's ResNet50 on a public "
+                     "image set with repeated subjects, when the test split is kept within the "
+                     "same subjects?"),
+        "method": ("Stratified within-subject split; standardised pixel MLP baseline vs standardised "
+                   "multinomial logistic regression with balanced class weights on HOG-style "
+                   "gradient-orientation features; 3-fold stratified CV on the training split for "
+                   "tuning; test set used once per seed."),
         "dataset": {
             "name": "Olivetti faces (scikit-learn fetch_olivetti_faces)",
             "source_url": SOURCE_URL,
@@ -143,8 +149,8 @@ def main():
         "higher_is_better": True,
         "baseline": ("Standardised pixel MLPClassifier (stand-in for the paper's ResNet50); "
                      "tuned over alpha and hidden layer size."),
-        "improved": ("LightGBM classifier with class_weight='balanced' on HOG-style cell "
-                     "orientation histograms; tuned over n_estimators and num_leaves."),
+        "improved": ("Standardised LogisticRegression with class_weight='balanced' on HOG-style cell "
+                     "orientation histograms; tuned over inverse regularisation strength C."),
         "metrics": {
             "baseline_score": float(b_acc),
             "improved_score": float(i_acc),
@@ -161,17 +167,18 @@ def main():
                   "identity recognition, not sweetness regression. The MLP is not ResNet50. The "
                   "test split has only about 120 images, so accuracy differences of a few points "
                   "are within noise; std is over three model seeds only, with one data split. "
-                  "HOG-style features are a simplified numpy implementation, not skimage HOG."),
+                  "HOG-style features are a simplified numpy implementation, not skimage HOG. "
+                  "The previous LightGBM improved model was replaced because its CV accuracy was "
+                  "far below the baseline's (boosted trees overfit with ~7 images per subject)."),
     }
     with open("results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     log("wrote results.json")
 
     # Optional chart: baseline vs improved test accuracy
-    import os
     os.makedirs("figures", exist_ok=True)
     plt.figure(figsize=(5, 4))
-    plt.bar(["baseline (pixel MLP)", "improved (HOG + LightGBM)"], [b_acc, i_acc],
+    plt.bar(["baseline (pixel MLP)", "improved (HOG + logistic)"], [b_acc, i_acc],
             yerr=[b[:, 0].std(), i[:, 0].std()], capsize=6, color=["gray", "tab:blue"])
     plt.ylabel("test accuracy (mean over seeds)")
     plt.ylim(0, 1.05)

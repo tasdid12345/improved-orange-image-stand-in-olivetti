@@ -1,23 +1,20 @@
-# Gradient boosting on compact image features vs a pixel-network baseline (face-image stand-in)
+# Olivetti faces: pixel MLP baseline vs HOG-style features + logistic regression
 
-**Motivation.** The paper "Image-based orange (Citrus Reticulata and Citrus Reticulata Blanco) sweetness measurement by ResNet50" (2025) estimates fruit sweetness from video frames with a ResNet50 CNN, using frames from a small number of clips, with a random frame split that leaves the same fruit on both sides. Its reported accuracy is high, but it relies on a deep network and a dataset that is not publicly available. This experiment asks whether a cheaper, more interpretable model can do as well on a public image set with repeated subjects.
+Question: can a regularised linear model on HOG-style gradient-orientation features beat a
+pixel-based MLP baseline (stand-in for the paper's ResNet50) on Olivetti faces, using a
+within-subject stratified train/test split?
 
-**Question.** Can a gradient-boosting model on compact image features beat a pixel-based neural-network stand-in for the paper's ResNet50 on a public image set with repeated subjects, when the test split is kept within the same subjects?
+Method:
+- Data: `fetch_olivetti_faces` (400 images, 40 subjects), one stratified 70/30 split (seed 42).
+- Baseline: standardised pixel MLPClassifier, tuned over alpha and hidden layer size with 3-fold CV on the training split.
+- Improved: standardised LogisticRegression (class_weight='balanced') on HOG-style cell histograms, tuned over C with the same 3-fold CV on the training split.
+- Test set is scored once per model seed (42, 43, 44).
 
-**Dataset.** The Olivetti faces set from scikit-learn (`fetch_olivetti_faces`), a public grayscale face image set in which each subject appears many times. It is a stand-in for the repeated-object setting, not the paper's own orange dataset (`same_as_paper: false`). The split is stratified within each subject, so the same subjects appear in training and test.
+Run: `pip install -r requirements.txt && python analysis.py` (CPU only, a few minutes).
+Outputs: `results.json` and `figures/accuracy_comparison.png`.
 
-**Baseline vs improved.**
-- Baseline: standardised pixel MLP (`MLPClassifier`), standing in for the paper's ResNet50.
-- Improved: LightGBM with balanced class weights on HOG-style gradient-orientation histograms.
-- Both models are tuned with 3-fold stratified cross-validation on the training split only. The test split is scored once per model seed.
-
-**How to run**
-```
-pip install -r requirements.txt
-python analysis.py
-```
-
-**Results** are written to `results.json` (and `figures/accuracy_comparison.png`).
+Caveats: the test split has about 120 images, so small accuracy differences are within noise; the
+MLP is not ResNet50 and the task is 40-way identity recognition, not sweetness regression.
 
 ## Reference
 
