@@ -16,6 +16,26 @@ Outputs: `results.json` and `figures/accuracy_comparison.png`.
 Caveats: the test split has about 120 images, so small accuracy differences are within noise; the
 MLP is not ResNet50 and the task is 40-way identity recognition, not sweetness regression.
 
+## Results (latest run)
+
+On the Olivetti faces dataset (a 120-image test split, not the paper's orange data), a standardised pixel MLP baseline reached 95.3% test accuracy, while a class-balanced logistic regression on HOG-style features reached 100%, a gain within noise given the small test set.
+
+| Metric | Value |
+|---|---|
+| baseline_score | 0.9528 |
+| improved_score | 1 |
+| improvement | 0.04722 |
+| baseline_score_std | 0.01964 |
+| improved_score_std | 0 |
+| baseline_f1 | 0.95 |
+| improved_f1 | 1 |
+| baseline_logloss | 0.2942 |
+| improved_logloss | 0.07817 |
+
+Run on 2026-10-19. Full output: [results.json](results.json) · [run.log](run.log)
+
+Notes: Olivetti faces is a stand-in for the paper's orange images (no public orange-Brix dataset with a download link); faces are not oranges and the task is 40-way identity recognition, not sweetness regression. The MLP is not ResNet50. The test split has only about 120 images, so accuracy differences of a few points are within noise; std is over three model seeds only, with one data split. HOG-style features are a simplified numpy implementation, not skimage HOG. The previous LightGBM improved model was replaced because its CV accuracy was far below the baseline's (boosted trees overfit with ~7 images per subject).
+
 ## Reference
 
 This project is motivated by the following paper:
