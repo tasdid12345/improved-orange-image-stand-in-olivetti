@@ -1,0 +1,29 @@
+{
+  "question": "Can a regularised linear model on HOG-style gradient features beat a pixel-based neural-network stand-in for the paper's ResNet50 on a public image set with repeated subjects, when the test split is kept within the same subjects?",
+  "method": "Stratified within-subject split; standardised pixel MLP baseline vs standardised multinomial logistic regression with balanced class weights on HOG-style gradient-orientation features; 3-fold stratified CV on the training split for tuning; test set used once per seed.",
+  "dataset": {
+    "name": "Olivetti faces (scikit-learn fetch_olivetti_faces)",
+    "source_url": "https://scikit-learn.org/stable/datasets/real_world.html#the-olivetti-faces-dataset",
+    "n_rows": 400,
+    "n_train": 280,
+    "n_test": 120,
+    "same_as_paper": false,
+    "baseline_is_papers_method": false
+  },
+  "metric_name": "test accuracy",
+  "higher_is_better": true,
+  "baseline": "Standardised pixel MLPClassifier (stand-in for the paper's ResNet50); tuned over alpha and hidden layer size.",
+  "improved": "Standardised LogisticRegression with class_weight='balanced' on HOG-style cell orientation histograms; tuned over inverse regularisation strength C.",
+  "metrics": {
+    "baseline_score": 0.9527777777777778,
+    "improved_score": 1.0,
+    "improvement": 0.047222222222222165,
+    "baseline_score_std": 0.019641855032959635,
+    "improved_score_std": 0.0,
+    "baseline_f1": 0.9500000000000001,
+    "improved_f1": 1.0,
+    "baseline_logloss": 0.29419889638150076,
+    "improved_logloss": 0.07816525143189755
+  },
+  "notes": "Olivetti faces is a stand-in for the paper's orange images (no public orange-Brix dataset with a download link); faces are not oranges and the task is 40-way identity recognition, not sweetness regression. The MLP is not ResNet50. The test split has only about 120 images, so accuracy differences of a few points are within noise; std is over three model seeds only, with one data split. HOG-style features are a simplified numpy implementation, not skimage HOG. The previous LightGBM improved model was replaced because its CV accuracy was far below the baseline's (boosted trees overfit with ~7 images per subject)."
+}
